@@ -112,10 +112,10 @@ def main(df, file):
         print(f'Processed {count} tweets')
 
         users_df.to_csv(f'hydrated_tweets/users_{file}')
-        tweets_df.to_csv(f'hydrated_tweets/tweets_{file}')
+        tweets_df.to_csv(f'hydrated_tweets/{file}')
 
         s3.upload_file(f'hydrated_tweets/users_{file}', 'covid19-tweets-dunyaoguz', f'users_{file}')
-        s3.upload_file(f'hydrated_tweets/tweets_{file}', 'covid19-tweets-dunyaoguz', f'tweets_{file}')
+        s3.upload_file(f'hydrated_tweets/{file}', 'covid19-tweets-dunyaoguz', f'{file}')
 
 if __name__ == "__main__":
     # get_tweet_count()
