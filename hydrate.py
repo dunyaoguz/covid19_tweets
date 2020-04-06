@@ -24,7 +24,7 @@ twitter_secret = os.environ['twitter_secret']
 aws_access = os.environ['aws_access']
 aws_secret = os.environ['aws_secret']
 
-twarc = Twarc(consumer_key, consumer_secret, access_token, access_token_secret)
+twarc = Twarc(consumer_key, consumer_secret, twitter_access, twitter_secret)
 
 s3 = boto3.client('s3',
                   region_name='us-west-2',
@@ -97,7 +97,7 @@ def hydrate(id, tweets_df, users_df):
 
     return tweets_df, users_df
 
-def main(df):
+def main(df, file):
 
     users_df = pd.DataFrame({'user_id': [], 'name': [], 'screen_name': [], 'location': [], 'description': [], 'followers_count': [],
                              'friends_count': [], 'statuses_count': [], 'created_at': [], 'verified': []})
@@ -111,19 +111,20 @@ def main(df):
         count += 1
         print(f'Processed {count} tweets')
 
-        users_df.to_csv('twitter_users.csv')
-        tweets_df.to_csv('covid_tweets.csv')
+        users_df.to_csv(f'hydrated_tweets/users_{file}')
+        tweets_df.to_csv(f'hydrated_tweets/tweets_{file}')
 
-        s3.upload_file('twitter_users.csv', 'covid19-tweets-dunyaoguz', 'twitter_users.csv')
-        s3.upload_file('covid_tweets.csv', 'covid19-tweets-dunyaoguz', 'covid_tweets.csv')
+        s3.upload_file(f'hydrated_tweets/users_{file}', 'covid19-tweets-dunyaoguz', f'users_{file}')
+        s3.upload_file(f'hydrated_tweets/tweets_{file}', 'covid19-tweets-dunyaoguz', f'tweets_{file}')
 
 if __name__ == "__main__":
     # get_tweet_count()
 
-    # tweets_data = pd.read_csv('data/full_dataset-clean.tsv', sep='\t')
-    # tweets_data['date'] = pd.to_datetime(tweets_data['date'])
-    # filtered_tweets_data = tweets_data[(tweets_data.date >= '2020-03-07') & (tweets_data.date <= '2020-03-14')]
-    # filtered_tweets_data.to_csv('data/full_dataset-clean-03072020-03142020.csv', index=False)
+    data_dirs = []
+    for path in Path('tweet_ids/').iterdir():
+        if path.name.endswith('.csv'):
+            data_dirs.append(path.name)
 
-    filtered_tweets_data = pd.read_csv('data/full_dataset-clean-03072020-03142020.csv')
-    main(filtered_tweets_data)
+    for file in data_dirs:
+        df = pd.read_csv(f'tweet_ids/{file}')
+        main(df, file)
