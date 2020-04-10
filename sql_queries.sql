@@ -9,7 +9,7 @@ CREATE TABLE public.tweets (
     favorite_count INTEGER NULL,
     in_reply_to_status_id INTEGER NULL,
     in_reply_to_user_id INTEGER NULL,
-)
+);
 
 CREATE TABLE public.users (
     id SERIAL PRIMARY KEY,
@@ -23,7 +23,7 @@ CREATE TABLE public.users (
     statuses_count INTEGER NULL
     created_at TIMESTAMP NOT NULL,
     verified BOOLEAN NOT NULL
-)
+);
 
 CREATE TABLE public.covid19_stats (
     id SERIAL PRIMARY KEY,
@@ -31,10 +31,10 @@ CREATE TABLE public.covid19_stats (
     day DATE NOT NULL,
     cases INTEGER NULL,
     deaths INTEGER NULL
-)
+);
 
 CREATE TABLE public.country_stats (
     id SERIAL PRIMARY KEY,
     country TEXT NOT NULL,
     population INTEGER NULL,
-)
+);
