@@ -5,6 +5,7 @@ import boto3
 import pandas as pd
 
 from datetime import datetime
+from io import StringIO, BytesIO
 
 pd.set_option('display.float_format', lambda x: '%.3f' % x)
 load_dotenv()
@@ -36,8 +37,9 @@ def process_tweet_data(bucket_contents):
 
     retval = {}
     for tweet_data in bucket_contents['tweet_data']:
+        print(tweet_data)
         object = s3.get_object(Bucket= data_lake_name, Key= tweet_data)
-        data = pd.read_csv(object['Body'])
+        data = pd.read_csv(object['Body'], lineterminator='\n')
 
         retval[tweet_data] = data.shape[0]
         df = df.append(data, sort=False)
@@ -65,7 +67,10 @@ def process_tweet_data(bucket_contents):
     original_tweet_counts = pd.read_csv('tweet_count.csv')
     for _, row in original_tweet_counts.iterrows():
         print('file:', row.file.split('/')[1])
-        print('percent hydrated:', retval[row.file.split('/')[1]] / row.number_of_tweets)
+        try:
+            print('percent hydrated:', retval[row.file.split('/')[1]] / row.number_of_tweets)
+        except:
+            pass
 
     # check if the data types are correct
     print('---------------------------------------------')
@@ -101,7 +106,7 @@ def process_user_data(bucket_contents):
 
     for user_data in bucket_contents['twitter_user_data']:
         object = s3.get_object(Bucket= data_lake_name, Key= user_data)
-        data = pd.read_csv(object['Body'])
+        data = pd.read_csv(object['Body'], lineterminator='\n')
         df = df.append(data, sort=False)
 
     # check for duplicates
@@ -128,8 +133,8 @@ def process_user_data(bucket_contents):
     print(df.dtypes)
 
     df['user_id'] = df['user_id'].apply(int)
-    bool_parser = lambda x: True if x == 1 else False
 
+    bool_parser = lambda x: True if x == 1 else False
     df['verified'] = df['verified'].apply(bool_parser)
 
     df['followers_count'] = df['followers_count'].apply(int)
@@ -145,11 +150,54 @@ def process_user_data(bucket_contents):
 
     return df
 
+def process_case_data(bucket_contents):
+    '''Perform data quality check and formatting fixes for data on covid cases'''
+
+    object = s3.get_object(Bucket= data_lake_name, Key= bucket_contents['case_data'][0])
+    df = pd.read_csv(object['Body'])
+
+    # check for duplicates
+    print('---------------------------------------------')
+    print('------------- DUPLICATE USERS ---------------')
+    print('---------------------------------------------')
+    print(df.duplicated().sum())
+    df.drop_duplicates(inplace=True)
+
+    # check number of null values, drop rows that have nulls in certain columns
+    print('---------------------------------------------')
+    print('---------------- NULL VALUES ----------------')
+    print('---------------------------------------------')
+    print(df.isna().sum())
+
+    # check if the data types are correct
+    print('---------------------------------------------')
+    print('---------------- DATA TYPES -----------------')
+    print('---------------------------------------------')
+    print(df.head())
+    print(df.dtypes)
+
+    # fix dates
+    df['dateRep'] = pd.to_datetime(df['dateRep'], format='%m/%d/%y')
+
+    return df
+
+def file_upload(df, key):
+    '''Upload a given dataframe on s3 using the key in the argument'''
+
+    csv_buffer = StringIO()
+    df.to_csv(csv_buffer)
+    s3.put_object(Body=csv_buffer.getvalue(), Bucket=data_lake_name, Key=key)
+
 def main():
     bucket_contents = get_objects()
 
-    tweets = process_twitter_data(bucket_contents)
+    tweets = process_tweet_data(bucket_contents)
     users = process_user_data(bucket_contents)
+    cases = process_case_data(bucket_contents)
+
+    file_upload(tweets, 'processed/tweets.csv')
+    file_upload(users, 'processed/twitter_users.csv')
+    file_upload(cases, 'processed/case_data.csv')
 
 if __name__ == "__main__":
     main()
