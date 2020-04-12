@@ -1,4 +1,4 @@
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 import os
 
 import boto3
@@ -25,7 +25,7 @@ def get_objects():
 
     case_data = [object['Key'] for object in objects if 'COVID-19' in object['Key']]
     tweet_data = [object['Key'] for object in objects if 'covid_tweets' in object['Key'] and 'users' not in object['Key']]
-    twitter_user_data = [object['Key'] for object in objects if 'users_GSU' in object['Key']]
+    twitter_user_data = [object['Key'] for object in objects if 'users' in object['Key']]
 
     return {'case_data': case_data, 'tweet_data': tweet_data, 'twitter_user_data': twitter_user_data}
 
@@ -43,6 +43,9 @@ def process_tweet_data(bucket_contents):
 
         retval[tweet_data] = data.shape[0]
         df = df.append(data, sort=False)
+
+    # clean column names
+    df.columns = df.columns.str.strip()
 
     # check number of null values, drop rows that have nulls in certain columns and impute nulls
     print('---------------------------------------------')
@@ -67,10 +70,7 @@ def process_tweet_data(bucket_contents):
     original_tweet_counts = pd.read_csv('tweet_count.csv')
     for _, row in original_tweet_counts.iterrows():
         print('file:', row.file.split('/')[1])
-        try:
-            print('percent hydrated:', retval[row.file.split('/')[1]] / row.number_of_tweets)
-        except:
-            pass
+        print('percent hydrated:', retval[row.file.split('/')[1]] / row.number_of_tweets)
 
     # check if the data types are correct
     print('---------------------------------------------')
@@ -96,7 +96,7 @@ def process_tweet_data(bucket_contents):
     df['in_reply_to_status_id'] = df['in_reply_to_status_id'].fillna(0).apply(int)
     df[['in_reply_to_status_id', 'in_reply_to_user_id']] = df[['in_reply_to_status_id', 'in_reply_to_user_id']].replace({0:None})
 
-    return df
+    return df.drop('Unnamed: 0', axis=1)
 
 def process_user_data(bucket_contents):
     '''Perform data quality check and formatting fixes for twitter user data'''
@@ -108,6 +108,9 @@ def process_user_data(bucket_contents):
         object = s3.get_object(Bucket= data_lake_name, Key= user_data)
         data = pd.read_csv(object['Body'], lineterminator='\n')
         df = df.append(data, sort=False)
+
+    # clean column names
+    df.columns = df.columns.str.strip()
 
     # check for duplicates
     print('---------------------------------------------')
@@ -121,9 +124,7 @@ def process_user_data(bucket_contents):
     print('---------------- NULL VALUES ----------------')
     print('---------------------------------------------')
     print(df.isna().sum())
-
-    for col in ['user_id', 'created_at', 'verified', 'statuses_count', 'friends_count', 'followers_count']:
-        df.drop(df[df[col].isna()].index, inplace=True)
+    df.drop(df[df['created_at'].isna()].index, axis=0, inplace=True)
 
     # check if the data types are correct
     print('---------------------------------------------')
@@ -137,18 +138,23 @@ def process_user_data(bucket_contents):
     bool_parser = lambda x: True if x == 1 else False
     df['verified'] = df['verified'].apply(bool_parser)
 
-    df['followers_count'] = df['followers_count'].apply(int)
-    df['friends_count'] = df['friends_count'].apply(int)
-    df['statuses_count'] = df['statuses_count'].apply(int)
+    df['followers_count'] = df['followers_count'].fillna(0).apply(int)
+    df['friends_count'] = df['friends_count'].fillna(0).apply(int)
+    df['statuses_count'] = df['statuses_count'].fillna(0).apply(int)
 
     # remove milli seconds
     df.created_at = df.created_at.str[0:19]
 
     # fix dates
-    dt_converter = lambda x: datetime.strptime('2020 ' + x.strip(), '%Y %a %b %d %X')
+    def dt_converter(x):
+        try:
+            return datetime.strptime('2020 ' + str(x).strip(), '%Y %a %b %d %X')
+        except:
+            return datetime.strptime(str(x).strip(), '%Y-%m-%d %H:%M:%S')
+
     df['created_at'] = df['created_at'].apply(dt_converter)
 
-    return df
+    return df.drop('Unnamed: 0', axis=1)
 
 def process_case_data(bucket_contents):
     '''Perform data quality check and formatting fixes for data on covid cases'''
