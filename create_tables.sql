@@ -1,4 +1,4 @@
-CREATE TABLE public.staging_cases (
+CREATE TABLE IF NOT EXISTS public.staging_cases (
     dateRep DATE NULL,
     day INTEGER NULL,
     month INTEGER NULL,
@@ -11,7 +11,7 @@ CREATE TABLE public.staging_cases (
     popData2018 REAL NULL
 );
 
-CREATE TABLE public.tweets (
+CREATE TABLE IF NOT EXISTS public.tweets (
     id BIGINT IDENTITY(0, 1) PRIMARY KEY,
     twitter_id INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE public.tweets (
     in_reply_to_user_id INTEGER NULL
 );
 
-CREATE TABLE public.users (
+CREATE TABLE IF NOT EXISTS public.users (
     id BIGINT IDENTITY(0, 1) PRIMARY KEY,
     twitter_user_id INTEGER NOT NULL,
     name TEXT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE public.users (
     verified BOOLEAN NOT NULL
 );
 
-CREATE TABLE public.covid19_stats (
+CREATE TABLE IF NOT EXISTS public.covid19_stats (
     id BIGINT IDENTITY(0, 1) PRIMARY KEY,
     country TEXT NOT NULL,
     day DATE NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE public.covid19_stats (
     deaths INTEGER NULL
 );
 
-CREATE TABLE public.country_stats (
+CREATE TABLE IF NOT EXISTS public.country_stats (
     id BIGINT IDENTITY(0, 1) PRIMARY KEY,
     country TEXT NOT NULL,
     population INTEGER NULL

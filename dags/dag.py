@@ -64,17 +64,6 @@ copy_covid_data = S3ToRedshiftTransfer(
     table='staging_cases',
     copy_options='csv')
 
-copy_covid_data = S3ToRedshiftTransfer(
-    task_id='Copy_covid_data',
-    dag=dag,
-    s3_bucket=f'{data_lake_name}/processed/',
-    s3_key='case_data.csv',
-    redshift_conn_id='redshift',
-    aws_conn_id='aws_credentials',
-    schema='public',
-    table='staging_cases',
-    copy_options=('csv'))
-
 end_operator = DummyOperator(task_id='Stop_execution', dag=dag)
 
 start_operator >> create_tables
