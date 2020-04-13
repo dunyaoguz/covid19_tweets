@@ -25,6 +25,8 @@ The purpose of this project is to allow analysts to examine public discourse via
 
 ## Data Model
 
+![ERD](images/erd.png)
+
 ## Directory
 
 * `hydrate.py`:
@@ -48,6 +50,8 @@ The purpose of this project is to allow analysts to examine public discourse via
 7. Data quality checks were performed to ensure that loaded data was complete, accurate and consistent
 
 Steps 5-7 are visualised in the following DAG:
+
+![DAG](images/pipeline.png)
 
 ## Quick Start
 
