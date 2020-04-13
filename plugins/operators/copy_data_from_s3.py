@@ -7,7 +7,7 @@ from airflow.utils.decorators import apply_defaults
 class S3ToRedshiftOperator(BaseOperator):
     """Extracts CSV data from S3 and loads it onto the specified table in the given Redshift cluster"""
 
-    ui_color = '#E09F7D'
+    ui_color = '#F9AC1D'
 
     @apply_defaults
     def __init__(self,

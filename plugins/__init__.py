@@ -8,5 +8,7 @@ class CustomPlugins(AirflowPlugin):
     name = "custom_plugins"
 
     operators = [
-        operators.S3ToRedshiftOperator
+        operators.S3ToRedshiftOperator,
+        operators.HasRowsOperator,
+        operators.ContextCheckOperator
     ]

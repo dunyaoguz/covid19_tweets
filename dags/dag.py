@@ -2,13 +2,10 @@ from datetime import datetime, timedelta
 import os
 
 from airflow import DAG
-from airflow.operators.dummy_operator import DummyOperator
 from airflow.hooks.postgres_hook import PostgresHook
 
 from airflow.operators.postgres_operator import PostgresOperator
-# from airflow.operators.custom_plugins import S3ToRedshiftOperator
-
-from copy_csv_from_s3 import S3ToRedshiftOperator
+from airflow.operators.custom_plugins import S3ToRedshiftOperator, HasRowsOperator, ContextCheckOperator
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -31,8 +28,6 @@ dag = DAG('covid_tweets_dag',
           schedule_interval='@daily',
           catchup=False
         )
-
-start_operator = DummyOperator(task_id='Begin_execution', dag=dag)
 
 create_tables = PostgresOperator(
     task_id='Create_tables',
@@ -78,10 +73,51 @@ load_tables = PostgresOperator(
     sql='load_tables.sql'
 )
 
-end_operator = DummyOperator(task_id='Stop_execution', dag=dag)
+check_tweet_records = HasRowsOperator(
+    task_id='Check_tweet_records',
+    dag=dag,
+    redshift_conn_id='redshift',
+    schema='public',
+    table='tweets')
 
-start_operator >> create_tables
+check_user_records = HasRowsOperator(
+    task_id='Check_user_records',
+    dag=dag,
+    redshift_conn_id='redshift',
+    schema='public',
+    table='users')
 
+check_users_completeness = ContextCheckOperator(
+    task_id='Check_users_completeness',
+    dag=dag,
+    redshift_conn_id='redshift',
+    query='''SELECT COUNT(*) FROM public.tweets
+             WHERE created_by NOT IN (SELECT DISTINCT user_id FROM public.users)''',
+    expected_result=0)
+
+check_covid19_records = HasRowsOperator(
+    task_id='Check_covid_records',
+    dag=dag,
+    redshift_conn_id='redshift',
+    schema='public',
+    table='covid19_stats')
+
+check_country_records = HasRowsOperator(
+    task_id='Check_country_records',
+    dag=dag,
+    redshift_conn_id='redshift',
+    schema='public',
+    table='country_stats')
+
+check_covid_records_completeness = ContextCheckOperator(
+    task_id='Check_covid_records_completeness',
+    dag=dag,
+    redshift_conn_id='redshift',
+    query='''SELECT COUNT(*) FROM public.covid19_stats
+             WHERE country NOT IN (SELECT DISTINCT country FROM public.country_stats)''',
+    expected_result=0)
+
+# OPERATOR PIPELINE
 create_tables >> copy_tweets
 create_tables >> copy_users
 create_tables >> copy_covid_data
@@ -90,4 +126,13 @@ copy_tweets >> load_tables
 copy_users >> load_tables
 copy_covid_data >> load_tables
 
-load_tables >> end_operator
+load_tables >> check_tweet_records
+load_tables >> check_user_records
+load_tables >> check_covid19_records
+load_tables >> check_country_records
+
+check_tweet_records >> check_users_completeness
+check_user_records >> check_users_completeness
+
+check_covid19_records >> check_covid_records_completeness
+check_country_records >> check_covid_records_completeness
