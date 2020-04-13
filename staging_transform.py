@@ -5,7 +5,6 @@ import boto3
 import pandas as pd
 
 from datetime import datetime
-from io import StringIO, BytesIO
 
 pd.set_option('display.float_format', lambda x: '%.3f' % x)
 load_dotenv()
@@ -44,6 +43,8 @@ def process_tweet_data(bucket_contents):
         retval[tweet_data] = data.shape[0]
         df = df.append(data, sort=False)
 
+    df.reset_index(drop=True, inplace=True)
+
     # clean column names
     df.columns = df.columns.str.strip()
 
@@ -52,7 +53,7 @@ def process_tweet_data(bucket_contents):
     print('---------------- NULL VALUES ----------------')
     print('---------------------------------------------')
     print(df.isna().sum())
-    for col in ['language', 'created_by', 'full_text']:
+    for col in ['tweet_id', 'created_by', 'created_at']:
         df.drop(df[df[col].isna()].index, inplace=True)
     df[['retweet_count', 'favorite_count']] = df[['retweet_count', 'favorite_count']].fillna(0)
 
@@ -67,7 +68,7 @@ def process_tweet_data(bucket_contents):
     print('---------------------------------------------')
     print('-------------- UNFOUND TWEETS ---------------')
     print('---------------------------------------------')
-    original_tweet_counts = pd.read_csv('tweet_count.csv')
+    original_tweet_counts = pd.read_csv('tweet_ids/tweet_count.csv')
     for _, row in original_tweet_counts.iterrows():
         print('file:', row.file.split('/')[1])
         print('percent hydrated:', retval[row.file.split('/')[1]] / row.number_of_tweets)
@@ -96,7 +97,7 @@ def process_tweet_data(bucket_contents):
     df['in_reply_to_status_id'] = df['in_reply_to_status_id'].fillna(0).apply(int)
     df[['in_reply_to_status_id', 'in_reply_to_user_id']] = df[['in_reply_to_status_id', 'in_reply_to_user_id']].replace({0:None})
 
-    return df.drop('Unnamed: 0', axis=1)
+    return df
 
 def process_user_data(bucket_contents):
     '''Perform data quality check and formatting fixes for twitter user data'''
@@ -109,15 +110,10 @@ def process_user_data(bucket_contents):
         data = pd.read_csv(object['Body'], lineterminator='\n')
         df = df.append(data, sort=False)
 
+    df.reset_index(drop=True, inplace=True)
+
     # clean column names
     df.columns = df.columns.str.strip()
-
-    # check for duplicates
-    print('---------------------------------------------')
-    print('------------- DUPLICATE USERS ---------------')
-    print('---------------------------------------------')
-    print(df.duplicated().sum())
-    df.drop_duplicates(inplace=True)
 
     # check number of null values, drop rows that have nulls in certain columns
     print('---------------------------------------------')
@@ -125,6 +121,7 @@ def process_user_data(bucket_contents):
     print('---------------------------------------------')
     print(df.isna().sum())
     df.drop(df[df['created_at'].isna()].index, axis=0, inplace=True)
+    df.drop(df[df['user_id'].isna()].index, axis=0, inplace=True)
 
     # check if the data types are correct
     print('---------------------------------------------')
@@ -154,7 +151,16 @@ def process_user_data(bucket_contents):
 
     df['created_at'] = df['created_at'].apply(dt_converter)
 
-    return df.drop('Unnamed: 0', axis=1)
+    # Dataset contains an entry for a user each time they tweeted about covid. Therefore, there are multiple entries per user
+    # Drop duplicates by grouping by unique user attributes. Get max value for friends, statuses and followers count
+    print('---------------------------------------------')
+    print('------------- DUPLICATE USERS ---------------')
+    print('---------------------------------------------')
+
+    df = df.groupby(['user_id', 'name', 'screen_name', 'location',
+                     'description', 'verified', 'created_at'])[['followers_count', 'friends_count', 'statuses_count']].max()\
+                                                                                                                      .reset_index()
+    return df
 
 def process_case_data(bucket_contents):
     '''Perform data quality check and formatting fixes for data on covid cases'''
@@ -190,9 +196,9 @@ def process_case_data(bucket_contents):
 def file_upload(df, key):
     '''Upload a given dataframe on s3 using the key in the argument'''
 
-    csv_buffer = StringIO()
-    df.to_csv(csv_buffer)
-    s3.put_object(Body=csv_buffer.getvalue(), Bucket=data_lake_name, Key=key)
+    df.to_csv(key, index=False)
+    s3.upload_file(key, data_lake_name, f'processed/{key}')
+    os.remove(key)
 
 def main():
     bucket_contents = get_objects()
@@ -201,9 +207,9 @@ def main():
     users = process_user_data(bucket_contents)
     cases = process_case_data(bucket_contents)
 
-    file_upload(tweets, 'processed/tweets.csv')
-    file_upload(users, 'processed/twitter_users.csv')
-    file_upload(cases, 'processed/case_data.csv')
+    file_upload(tweets, 'tweets.csv')
+    file_upload(users, 'twitter_users.csv')
+    file_upload(cases, 'case_data.csv')
 
 if __name__ == "__main__":
     main()
