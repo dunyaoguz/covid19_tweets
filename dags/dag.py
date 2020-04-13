@@ -5,8 +5,10 @@ from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.hooks.postgres_hook import PostgresHook
 
-from airflow.operators.s3_to_redshift_operator import S3ToRedshiftTransfer
 from airflow.operators.postgres_operator import PostgresOperator
+# from airflow.operators.custom_plugins import S3ToRedshiftOperator
+
+from copy_csv_from_s3 import S3ToRedshiftOperator
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -32,37 +34,49 @@ dag = DAG('covid_tweets_dag',
 
 start_operator = DummyOperator(task_id='Begin_execution', dag=dag)
 
-copy_tweets = S3ToRedshiftTransfer(
+create_tables = PostgresOperator(
+    task_id='Create_tables',
+    dag=dag,
+    postgres_conn_id='redshift',
+    sql='create_tables.sql'
+)
+
+copy_tweets = S3ToRedshiftOperator(
     task_id='Copy_tweets',
     dag=dag,
     s3_bucket=f'{data_lake_name}/processed',
     s3_key='tweets.csv',
     redshift_conn_id='redshift',
-    aws_conn_id='aws_credentials',
+    aws_credentials='aws_credentials',
     schema='public',
     table='tweets')
 
-copy_users = S3ToRedshiftTransfer(
+copy_users = S3ToRedshiftOperator(
     task_id='Copy_users',
     dag=dag,
     s3_bucket=f'{data_lake_name}/processed',
     s3_key='twitter_users.csv',
     redshift_conn_id='redshift',
-    aws_conn_id='aws_credentials',
+    aws_credentials='aws_credentials',
     schema='public',
-    table='users',
-    copy_options='csv')
+    table='users')
 
-copy_covid_data = S3ToRedshiftTransfer(
+copy_covid_data = S3ToRedshiftOperator(
     task_id='Copy_covid_data',
     dag=dag,
     s3_bucket=f'{data_lake_name}/processed',
     s3_key='case_data.csv',
     redshift_conn_id='redshift',
-    aws_conn_id='aws_credentials',
+    aws_credentials='aws_credentials',
     schema='public',
-    table='staging_cases',
-    copy_options='csv')
+    table='staging_cases')
+
+load_tables = PostgresOperator(
+    task_id='Load_tables',
+    dag=dag,
+    postgres_conn_id='redshift',
+    sql='load_tables.sql'
+)
 
 end_operator = DummyOperator(task_id='Stop_execution', dag=dag)
 
@@ -72,6 +86,8 @@ create_tables >> copy_tweets
 create_tables >> copy_users
 create_tables >> copy_covid_data
 
-copy_tweets >> end_operator
-copy_users >> end_operator
-copy_covid_data >> end_operator
+copy_tweets >> load_tables
+copy_users >> load_tables
+copy_covid_data >> load_tables
+
+load_tables >> end_operator
