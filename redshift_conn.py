@@ -84,13 +84,13 @@ def reset():
     redshift.delete_cluster(ClusterIdentifier='redshift-cluster-1',
                             SkipFinalClusterSnapshot=True)
 
-def main():
+def main(mode):
     ROLE_ARN = iam.get_role(RoleName='dwh_project_s3_access')['Role']['Arn']
     print(f'ARN: {ROLE_ARN}')
 
-    # uncomment code below to create cluster
-    create_cluster(ROLE_ARN)
-    check_status('available')
+    if mode == 'C':
+        create_cluster(ROLE_ARN)
+        check_status('available')
 
     ENDPOINT = redshift.describe_clusters(ClusterIdentifier='redshift-cluster-1')['Clusters'][0]['Endpoint']['Address']
     PORT = redshift.describe_clusters(ClusterIdentifier='redshift-cluster-1')['Clusters'][0]['Endpoint']['Port']
@@ -99,9 +99,10 @@ def main():
 
     check_connection(ENDPOINT, PORT)
 
-    # uncomment the code below to delete the cluster
-    # reset()
-    # check_status('deleted')
+    if mode == 'D':
+        reset()
+        check_status('deleted')
 
 if __name__ == "__main__":
-    main()
+    mode = input('Do you want to create a cluster or delete a cluster? Enter C for create and D for delete: ')
+    main(mode)
