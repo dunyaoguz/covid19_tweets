@@ -9,7 +9,7 @@ The purpose of this project is to allow analysts to examine public discourse via
 * What was the relationship between number of tweets and number of cases in different countries?
 * How did the volume of coronavirus related tweets and interactions with coronavirus related tweets change after March 12 in different countries? 
 * Do countries with higher number of cases per capita experience higher number of deaths per capita? 
-* What was the relationship between number of users publishing tweets, and the number in deaths and countries across different countries?
+* What was the relationship between number of users publishing tweets, and the number in deaths and cases across different countries?
 
 ## Data Sources
 
@@ -27,22 +27,11 @@ The purpose of this project is to allow analysts to examine public discourse via
 
 ![ERD](images/erd.png)
 
-## Directory
-
-* `hydrate.py`:
-* `redshift_conn.py`:
-* `staging_transform.py`:
-* `dags/dag.py`:
-* `dags/create_tables.sql`:
-* `dags/load_tables.sql`:
-* `plugins/operators/copy_data_from_s3.py`:
-* `plugins/operators/check_row_count.py`:
-* `plugins/operators/check_context.py`:
-
 ## ETL Process and Data Pipeline
 
 1. Source data was downloaded locally 
-2. Tweet ids were hydrated 
+2. Tweet ids were hydrated (i.e. Full details of the tweets were obtained from Twitter API). 
+    - Twitter's Terms of Service do not allow the full JSON for datasets of tweets to be distributed to third parties. As such, collections of tweets such as the one used in this project get stored as tweet ids, and it is upon the user of the data to "hydrate" the tweet ids to get their full information.
 3. Preprocessing was performed on hydrated tweet data and covid19 data, including de-duplication, null imputation and data type correction. Processed data was uploaded on S3 
 4. Redshift cluster was instantiated 
 5. Staging, fact and dimension tables were created in Redshift 
@@ -52,6 +41,18 @@ The purpose of this project is to allow analysts to examine public discourse via
 Steps 5-7 are visualised in the following DAG:
 
 ![DAG](images/pipeline.png)
+
+## Directory
+
+* `hydrate.py`: Hydrates each tweet id that exists in the tweets_ids folder
+* `redshift_conn.py`: Creates and deletes a redshift cluster programmatically
+* `staging_transform.py`: Processes the raw data
+* `dags/dag.py`: Collection of all the tasks in the project, organized in a way that reflects their relationships and dependencies
+* `dags/create_tables.sql`: SQL code that creates staging, fact and dim tables
+* `dags/load_tables.sql`: SQL code that inserts data from staging tables into fact and dim tables
+* `plugins/operators/copy_data_from_s3.py`: Custom operator that copies data from S3 to Redshift
+* `plugins/operators/check_row_count.py`: Custom operator that checks for the number of rows in fact and dim tables
+* `plugins/operators/check_context.py`: Custom operator that runs a given query, and checks if the expected result match the actual result
 
 ## Quick Start
 
