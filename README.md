@@ -4,7 +4,7 @@
 
 Over the past few weeks, COVID19 has dramatically impacted all realms of public life - from where we go to how we interact with one another - everywhere in the world. In North America, while the growing spread of the novel coronavirus was widely known since the beginning of February, its extreme repercussions begun in the week of March 9th, after the suspension of the NBA season and Trump's ban on European travel on March 12. The crisis came into full force in the following week in Canada and USA, leading to a stock market crash, closure of borders to all foreign nationals, mass lay offs and severe social distancing measures. 
 
-The purpose of this project is to allow analysts to examine public discourse via Twitter regarding COVID19 in a period of 7 days leading upto, including and immediately following March 12 - the point at which the crisis truly and fully erupted in North America - and how it related to the growing number of cases and deaths across the world. Some questions that can be tackled with the data gathered in the project are as follows:
+The purpose of this project is to allow analysts to examine public discourse via Twitter regarding COVID19 in a period of 7 days leading up to, including and immediately following March 12 - the point at which the crisis truly and fully erupted in North America - and how it related to the growing number of cases and deaths across the world. Some questions that can be tackled with the data gathered in the project are as follows:
 
 * What was the relationship between number of tweets and number of cases in different countries?
 * How did the volume of coronavirus related tweets and interactions with coronavirus related tweets change after March 12 in different countries? 
@@ -56,15 +56,27 @@ Steps 5-7 are visualised in the following DAG:
 
 ## Quick Start
 
-1. `git clone https://github.com/dunyaoguz/covid19_tweets`
-2. `cd covid19_tweets`
-3. Obtain a Twitter developer account and get API keys. Create a .env file with your consumer key, consumer secret, twitter access and twitter secret keys
-4. Run `python hydrate.py`
-5. Create an IAM user on your AWS account with full S3 and Redshift access. Add your AWS secret access key and AWS access key on your .env file
-6. Run `python redshift_conn.py`
-7. Instantiate Airflow with the `airflow scheduler` and `airflow webserver` commands
-8. Create connections on Airflow to your Redshift data warehouse (conn type=postgres) and AWS credentials (conn type=aws)
-9. Move the dags and plugins folder to your Airflow home directory
-10. Turn on covid_tweets_dag
+1. Download the raw data from the two sources linked above
+2. `git clone https://github.com/dunyaoguz/covid19_tweets`
+3. `cd covid19_tweets`
+4. Obtain a Twitter developer account and get API keys. Create a .env file with your consumer key, consumer secret, twitter access and twitter secret keys
+5. Run `python hydrate.py`
+6. Create an IAM user on your AWS account with full S3 and Redshift access. Add your AWS secret access key and AWS access key on your .env file
+7. Run `python redshift_conn.py`
+8. Instantiate Airflow with the `airflow scheduler` and `airflow webserver` commands
+9. Create connections on Airflow to your Redshift data warehouse (conn type=postgres) and AWS credentials (conn type=aws)
+10. Move the dags and plugins folder to your Airflow home directory
+11. Go localhost:8080 on your browser and turn on covid_tweets_dag
 
-## Potential Scenarios
+## Other Scenarios
+
+Let's address what would have to be done differently in case of some potential scenarios. 
+
+* **The data was increased by 100x:** 
+`hydrate.py` and `staging_transform.py` scripts would not be able to be run on a single machine. Distributed computing would need to be utilized in order the hydrate tweets. Data processing would need to be done using Apache Spark, instead of pandas dataframes, on Amazon EMR.
+
+* **The database needed to be accessed by 100+ people:** 
+The Redshift cluster used was the cheapest one available. (4 dc2.large type nodes, with 160GB fixed local SSD storage). If the database needed to be accessed by 100+ people, the node type of the cluster would likely need to be changed to a more performant one with better CPU, RAM and storage capacity, and the number of nodes in the cluster would likely need to be increased. 
+
+* **The pipelines would be run on a daily basis by 7am every day:** 
+The schedule of the dag would need to be changed in order to ensure completion before 7 AM. 
